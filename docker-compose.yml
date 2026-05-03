@@ -1,0 +1,45 @@
+services:
+  # ====================== POSTGRESQL ======================
+  postgres:
+    image: postgres:16-alpine
+    container_name: sentinel-pay-db
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: sentinelpay
+      POSTGRES_USER: sentinel
+      POSTGRES_PASSWORD: sentinel123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U sentinel -d sentinelpay" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ====================== REDIS ======================
+  redis:
+    image: redis:7-alpine
+    container_name: sentinel-pay-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  # ====================== RABBITMQ ======================
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: sentinel-pay-mq
+    ports:
+      - "5672:5672"   # AMQP port
+      - "15672:15672" # Management UI port
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbit_data:/var/lib/rabbitmq
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbit_data:
