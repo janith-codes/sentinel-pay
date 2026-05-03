@@ -5,12 +5,14 @@ server:
 spring:
   application:
     name: sentinel-pay-api
+  profiles:
+    include: local
 
   # ====================== DATABASE (PostgreSQL) ======================
   datasource:
     url: jdbc:postgresql://localhost:5433/sentinelpay
-    username: sentinel
-    password: sentinel123
+    username:
+    password:
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 20
@@ -46,13 +48,13 @@ spring:
   rabbitmq:
     host: localhost
     port: 5672
-    username: guest
-    password: guest
+    username:
+    password:
 
   # ====================== SPRING AI (OpenAI) ======================
   ai:
     openai:
-      api-key: ${OPENAI_API_KEY:sk-your-openai-key-here}   # Change this or set environment variable
+      api-key: ${OPENAI_API_KEY:sk-your-openai-key-here}
 
   # ====================== ACTUATOR / OBSERVABILITY ======================
   management:
