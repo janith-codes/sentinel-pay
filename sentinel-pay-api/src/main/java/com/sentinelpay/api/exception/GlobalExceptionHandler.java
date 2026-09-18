@@ -2,9 +2,11 @@ package com.sentinelpay.api.exception;
 
 import com.sentinelpay.domain.exception.AccountNotFoundException;
 import com.sentinelpay.domain.exception.InsufficientBalanceException;
+import com.sentinelpay.domain.exception.InvalidCredentialsException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -31,6 +33,27 @@ public class GlobalExceptionHandler {
     ProblemDetail handleInsufficientBalance(InsufficientBalanceException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
         problem.setType(URI.create("/errors/insufficient-balance"));
+        problem.setProperty("timestamp", Instant.now());
+        return problem;
+    }
+
+    @ExceptionHandler(InvalidCredentialsException.class)
+    ProblemDetail handleInvalidCredentials(InvalidCredentialsException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
+        problem.setType(URI.create("/errors/invalid-credentials"));
+        problem.setProperty("timestamp", Instant.now());
+        return problem;
+    }
+
+    /**
+     * Covers authorization failures raised after the request reaches a handler, such as the account
+     * ownership check and {@code @PreAuthorize}. Filter-chain denials are handled by
+     * {@code ProblemDetailAccessDeniedHandler} instead.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    ProblemDetail handleAccessDenied(AccessDeniedException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        problem.setType(URI.create("/errors/access-denied"));
         problem.setProperty("timestamp", Instant.now());
         return problem;
     }

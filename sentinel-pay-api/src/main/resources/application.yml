@@ -59,6 +59,14 @@ spring:
     openai:
       api-key: ${OPENAI_API_KEY:sk-your-openai-key-here}
 
+# ====================== SECURITY (JWT) ======================
+# JWT_SECRET must be overridden in every non-local environment.
+sentinelpay:
+  jwt:
+    secret: ${JWT_SECRET:dev-only-secret-change-me-in-production-0123456789}
+    expiration: ${JWT_EXPIRATION:900000}
+    issuer: sentinel-pay
+
 # ====================== ACTUATOR / OBSERVABILITY ======================
 management:
   endpoints:

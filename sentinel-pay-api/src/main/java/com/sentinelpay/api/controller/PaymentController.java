@@ -4,11 +4,14 @@ import com.sentinelpay.api.dto.PaymentRequest;
 import com.sentinelpay.application.dto.PaymentCommand;
 import com.sentinelpay.application.dto.PaymentResponse;
 import com.sentinelpay.application.port.in.ProcessPaymentUseCase;
+import com.sentinelpay.domain.identity.AuthenticatedUser;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -24,7 +27,13 @@ public class PaymentController {
     @PostMapping
     public ResponseEntity<PaymentResponse> processPayment(
             @Valid @RequestBody PaymentRequest request,
-            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @AuthenticationPrincipal AuthenticatedUser caller) {
+
+        if (!caller.canTransactOn(request.accountId())) {
+            log.warn("User {} attempted to transact on account {}", caller.username(), request.accountId());
+            throw new AccessDeniedException("You are not allowed to transact on this account");
+        }
 
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             idempotencyKey = UUID.randomUUID().toString();
