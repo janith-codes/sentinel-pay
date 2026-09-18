@@ -1,6 +1,5 @@
 package com.sentinelpay.infrastructure.redis;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sentinelpay.application.dto.PaymentResponse;
 import com.sentinelpay.application.port.out.IdempotencyPort;
@@ -34,12 +33,17 @@ public class RedisIdempotencyAdapter implements IdempotencyPort {
         }
     }
 
+    /**
+     * Runs after the payment has committed, so a cache failure must never reach the caller.
+     * Losing the entry only degrades duplicate detection to the unique constraint on
+     * {@code transactions.idempotency_key}.
+     */
     @Override
     public void store(String key, PaymentResponse response, Duration ttl) {
         try {
             String value = objectMapper.writeValueAsString(response);
             redisTemplate.opsForValue().set(KEY_PREFIX + key, value, ttl);
-        } catch (JsonProcessingException e) {
+        } catch (Exception e) {
             log.warn("Failed to store idempotency key {}: {}", key, e.getMessage());
         }
     }

@@ -2,8 +2,10 @@ package com.sentinelpay.application.service;
 
 import com.sentinelpay.application.dto.PaymentCommand;
 import com.sentinelpay.application.dto.PaymentResponse;
+import com.sentinelpay.application.event.PaymentCommittedEvent;
 import com.sentinelpay.application.port.out.*;
 import com.sentinelpay.domain.exception.AccountNotFoundException;
+import com.sentinelpay.domain.exception.InsufficientBalanceException;
 import com.sentinelpay.domain.model.Account;
 import com.sentinelpay.domain.model.AccountStatus;
 import com.sentinelpay.domain.model.Transaction;
@@ -19,9 +21,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
-import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -37,7 +39,7 @@ class ProcessPaymentServiceTest {
     @Mock TransactionRepositoryPort transactionRepository;
     @Mock FraudDetectionPort fraudDetection;
     @Mock IdempotencyPort idempotencyPort;
-    @Mock EventPublisherPort eventPublisher;
+    @Mock ApplicationEventPublisher applicationEvents;
 
     @InjectMocks
     ProcessPaymentService service;
@@ -63,8 +65,27 @@ class ProcessPaymentServiceTest {
 
         assertThat(response.status()).isEqualTo(TransactionStatus.COMPLETED);
         verify(accountRepository).save(testAccount);
-        verify(eventPublisher).publishPaymentProcessed(any(Transaction.class));
-        verify(idempotencyPort).store(eq("key-001"), eq(response), any(Duration.class));
+
+        // Publishing and caching are the post-commit handler's job; the service only requests them.
+        ArgumentCaptor<PaymentCommittedEvent> event = ArgumentCaptor.forClass(PaymentCommittedEvent.class);
+        verify(applicationEvents).publishEvent(event.capture());
+        assertThat(event.getValue().idempotencyKey()).isEqualTo("key-001");
+        assertThat(event.getValue().response()).isEqualTo(response);
+        assertThat(event.getValue().transaction().getStatus()).isEqualTo(TransactionStatus.COMPLETED);
+    }
+
+    @Test
+    void process_requestsNoPostCommitEffectsWhenBalanceIsInsufficient() {
+        Account lowBalance = new Account(UUID.randomUUID(), "ACC-002", Money.of(100.0), AccountStatus.ACTIVE);
+        PaymentCommand tooLarge = new PaymentCommand(lowBalance.getId(), new BigDecimal("500.00"), "LKR");
+        when(accountRepository.findById(lowBalance.getId())).thenReturn(Optional.of(lowBalance));
+        when(fraudDetection.evaluate(tooLarge)).thenReturn(RiskScore.low("Normal"));
+
+        assertThatThrownBy(() -> service.process(tooLarge, "key-low-balance"))
+                .isInstanceOf(InsufficientBalanceException.class);
+
+        verify(transactionRepository, never()).save(any());
+        verifyNoInteractions(applicationEvents);
     }
 
     @Test
@@ -86,7 +107,7 @@ class ProcessPaymentServiceTest {
         PaymentResponse response = service.process(command, "dup-key");
 
         assertThat(response).isEqualTo(cached);
-        verifyNoInteractions(accountRepository, fraudDetection, transactionRepository);
+        verifyNoInteractions(accountRepository, fraudDetection, transactionRepository, applicationEvents);
     }
 
     @Test
@@ -95,6 +116,8 @@ class ProcessPaymentServiceTest {
 
         assertThatThrownBy(() -> service.process(command, "key-003"))
                 .isInstanceOf(AccountNotFoundException.class);
+
+        verifyNoInteractions(applicationEvents);
     }
 
     @Test

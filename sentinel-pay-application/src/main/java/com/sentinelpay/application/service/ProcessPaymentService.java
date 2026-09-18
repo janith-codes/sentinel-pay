@@ -2,6 +2,7 @@ package com.sentinelpay.application.service;
 
 import com.sentinelpay.application.dto.PaymentCommand;
 import com.sentinelpay.application.dto.PaymentResponse;
+import com.sentinelpay.application.event.PaymentCommittedEvent;
 import com.sentinelpay.application.port.in.ProcessPaymentUseCase;
 import com.sentinelpay.application.port.out.*;
 import com.sentinelpay.domain.exception.AccountNotFoundException;
@@ -13,10 +14,10 @@ import com.sentinelpay.domain.valueobject.Money;
 import com.sentinelpay.domain.valueobject.RiskScore;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Duration;
 import java.util.UUID;
 
 @Slf4j
@@ -29,7 +30,7 @@ public class ProcessPaymentService implements ProcessPaymentUseCase {
     private final TransactionRepositoryPort transactionRepository;
     private final FraudDetectionPort fraudDetection;
     private final IdempotencyPort idempotencyPort;
-    private final EventPublisherPort eventPublisher;
+    private final ApplicationEventPublisher applicationEvents;
 
     @Override
     public PaymentResponse process(PaymentCommand command, String idempotencyKey) {
@@ -68,14 +69,17 @@ public class ProcessPaymentService implements ProcessPaymentUseCase {
         }
 
         transactionRepository.save(transaction);
-        eventPublisher.publishPaymentProcessed(transaction);
 
         PaymentResponse response = new PaymentResponse(
                 transaction.getId(),
                 transaction.getStatus(),
                 resolveMessage(transaction.getStatus())
         );
-        idempotencyPort.store(idempotencyKey, response, Duration.ofHours(24));
+
+        // Broker publishing and idempotency caching are deferred to AFTER_COMMIT by
+        // PaymentPostCommitHandler. Both are irreversible, so performing them here would leave a
+        // published event or a cached success behind whenever this transaction rolls back.
+        applicationEvents.publishEvent(new PaymentCommittedEvent(transaction, idempotencyKey, response));
 
         return response;
     }
