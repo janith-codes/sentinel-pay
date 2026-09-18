@@ -23,7 +23,6 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -32,7 +31,6 @@ import java.time.Duration;
 import java.util.Set;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
@@ -226,20 +224,15 @@ class SecurityIntegrationTest {
 
     @Test
     void adminOnlyEndpoint_withAdminToken_passesAuthorization() throws Exception {
-        // Actuator endpoints are not mapped in the web slice, so only the absence of an
-        // authentication/authorization rejection can be asserted here.
-        int status = mockMvc.perform(get("/actuator/metrics")
+        // Actuator endpoints are not mapped in the web slice, so clearing authorization surfaces as 404.
+        mockMvc.perform(get("/actuator/metrics")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenFor(Set.of(Role.ADMIN), null)))
-                .andReturn().getResponse().getStatus();
-
-        assertThat(status).isNotIn(HttpStatus.UNAUTHORIZED.value(), HttpStatus.FORBIDDEN.value());
+                .andExpect(status().isNotFound());
     }
 
     @Test
     void publicHealthEndpoint_isReachableWithoutToken() throws Exception {
-        int status = mockMvc.perform(get("/actuator/health"))
-                .andReturn().getResponse().getStatus();
-
-        assertThat(status).isNotIn(HttpStatus.UNAUTHORIZED.value(), HttpStatus.FORBIDDEN.value());
+        mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().isNotFound());
     }
 }
