@@ -5,6 +5,7 @@ import com.sentinelpay.application.dto.PaymentResponse;
 import com.sentinelpay.application.port.in.ProcessPaymentUseCase;
 import com.sentinelpay.application.port.out.*;
 import com.sentinelpay.domain.exception.AccountNotFoundException;
+import com.sentinelpay.domain.exception.InsufficientBalanceException;
 import com.sentinelpay.domain.model.Account;
 import com.sentinelpay.domain.model.Transaction;
 import com.sentinelpay.domain.model.TransactionStatus;
@@ -59,6 +60,8 @@ public class ProcessPaymentService implements ProcessPaymentUseCase {
                 account.debit(new Money(command.amount()));
                 accountRepository.save(account);
             }
+        } catch (InsufficientBalanceException | IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Payment processing failed for tx {}: {}", transaction.getId(), e.getMessage());
             transaction.fail(e.getMessage());

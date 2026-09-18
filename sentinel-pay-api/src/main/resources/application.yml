@@ -7,6 +7,9 @@ spring:
     name: sentinel-pay-api
   profiles:
     include: local
+  threads:
+    virtual:
+      enabled: true
 
   # ====================== DATABASE (PostgreSQL) ======================
   datasource:

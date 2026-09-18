@@ -17,13 +17,13 @@ A production-grade, highly scalable payment gateway backend built with **Clean A
 - **Hexagonal Architecture** (Ports & Adapters) – zero framework leakage in domain
 - **Real-time AI Fraud Detection** using Spring AI (OpenAI / Ollama)
 - **Java 21 Virtual Threads** for extreme concurrency and low memory footprint
-- **Idempotency** support on payment endpoints (X-Idempotency-Key)
-- **Optimistic Locking** + retry mechanism for account balance updates
+- **Idempotency** support on payment endpoints (`Idempotency-Key` header)
+- **Optimistic Locking** on account balance updates to prevent race conditions
 - **Event-Driven** notifications via RabbitMQ
 - **Distributed caching** with Redis
 - **Full observability** – Actuator, Micrometer, Prometheus metrics
 - **Database migrations** with Flyway
-- **Production-ready** testing with Testcontainers
+- **Unit & integration tests** with JUnit 5 + Mockito
 
 ---
 
@@ -90,7 +90,7 @@ sentinel-pay/
 | Messaging          | RabbitMQ                            |
 | AI                 | Spring AI (OpenAI / Ollama)         |
 | Observability      | Actuator + Micrometer + Prometheus  |
-| Testing            | JUnit 5 + Mockito + Testcontainers  |
+| Testing            | JUnit 5 + Mockito                   |
 
 ---
 
@@ -108,7 +108,7 @@ sentinel-pay/
 
 ```http
 POST /api/v1/payments
-X-Idempotency-Key: 550e8400-e29b-41d4-a716-446655440000
+Idempotency-Key: 550e8400-e29b-41d4-a716-446655440000
 Content-Type: application/json
 
 {
@@ -124,7 +124,7 @@ Content-Type: application/json
 
 - Health check: `GET /actuator/health`
 - Prometheus metrics: `GET /actuator/prometheus`
-- Custom fraud metrics and transaction throughput exposed
+- Standard JVM, HTTP, and database metrics via Micrometer (auto-instrumented)
 
 ---
 

@@ -36,9 +36,9 @@ public class PaymentController {
         PaymentResponse response = processPaymentUseCase.process(command, idempotencyKey);
 
         HttpStatus status = switch (response.status()) {
-            case COMPLETED -> HttpStatus.CREATED;
-            case REJECTED  -> HttpStatus.UNPROCESSABLE_ENTITY;
-            default        -> HttpStatus.INTERNAL_SERVER_ERROR;
+            case COMPLETED        -> HttpStatus.CREATED;
+            case REJECTED, FAILED -> HttpStatus.UNPROCESSABLE_ENTITY;
+            default               -> HttpStatus.INTERNAL_SERVER_ERROR;
         };
 
         return ResponseEntity.status(status).body(response);
