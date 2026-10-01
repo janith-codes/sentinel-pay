@@ -15,6 +15,9 @@ import com.sentinelpay.domain.valueobject.RiskScore;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,12 +29,30 @@ import java.util.UUID;
 @Transactional
 public class ProcessPaymentService implements ProcessPaymentUseCase {
 
+    /** Initial attempt plus at most two retries. */
+    public static final int MAX_ATTEMPTS = 3;
+
     private final AccountRepositoryPort accountRepository;
     private final TransactionRepositoryPort transactionRepository;
     private final FraudDetectionPort fraudDetection;
     private final IdempotencyPort idempotencyPort;
     private final ApplicationEventPublisher applicationEvents;
 
+    /**
+     * Concurrent payments on one account collide on {@code AccountJpaEntity#version}. That check
+     * runs when this transaction flushes, so the failure is raised by the transaction proxy after
+     * this method has already returned - it cannot be handled inside the method body.
+     *
+     * <p>Spring Retry's advisor sits outside the transaction advisor, so each attempt runs in its
+     * own transaction and reloads the account at its current version. Rollback of a failed attempt
+     * discards its transaction row and suppresses its AFTER_COMMIT effects, so only the attempt
+     * that commits publishes an event or caches a response.
+     */
+    @Retryable(
+            retryFor = OptimisticLockingFailureException.class,
+            maxAttempts = MAX_ATTEMPTS,
+            backoff = @Backoff(delay = 50, multiplier = 2, random = true)
+    )
     @Override
     public PaymentResponse process(PaymentCommand command, String idempotencyKey) {
         var cached = idempotencyPort.get(idempotencyKey);
@@ -61,7 +82,9 @@ public class ProcessPaymentService implements ProcessPaymentUseCase {
                 account.debit(new Money(command.amount()));
                 accountRepository.save(account);
             }
-        } catch (InsufficientBalanceException | IllegalStateException e) {
+        } catch (InsufficientBalanceException | IllegalStateException | OptimisticLockingFailureException e) {
+            // A lock conflict must stay retryable: swallowing it below would silently turn a
+            // transient collision into a permanently FAILED transaction.
             throw e;
         } catch (Exception e) {
             log.error("Payment processing failed for tx {}: {}", transaction.getId(), e.getMessage());
