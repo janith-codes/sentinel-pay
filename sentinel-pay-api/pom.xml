@@ -124,9 +124,24 @@
 
     <build>
         <plugins>
+            <!--
+              This project does not inherit spring-boot-starter-parent, so repackage is not
+              bound automatically. The exec classifier keeps the plain jar as the main artifact
+              that Failsafe puts on the classpath; the executable archive is the -exec jar.
+            -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                        <configuration>
+                            <classifier>exec</classifier>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
 
             <!--

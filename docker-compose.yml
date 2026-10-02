@@ -1,4 +1,37 @@
 services:
+  # ====================== SENTINELPAY API ======================
+  sentinel-pay:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: sentinel-pay:test
+    container_name: sentinel-pay-api
+    ports:
+      - "8080:8080"
+    environment:
+      # Local Compose credentials. Same values already used for host-side development.
+      # Override these from the environment for any shared or deployed runtime.
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: sentinelpay
+      DB_USERNAME: sentinel
+      DB_PASSWORD: sentinel123
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      JWT_SECRET: dev-only-secret-change-me-in-production-0123456789
+      JWT_EXPIRATION: "900000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
   # ====================== POSTGRESQL ======================
   postgres:
     image: postgres:16-alpine
@@ -25,6 +58,11 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # ====================== RABBITMQ ======================
   rabbitmq:
@@ -38,6 +76,12 @@ services:
       RABBITMQ_DEFAULT_PASS: guest
     volumes:
       - rabbit_data:/var/lib/rabbitmq
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
 
 volumes:
   postgres_data:
