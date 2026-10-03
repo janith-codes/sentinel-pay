@@ -81,6 +81,10 @@ management:
       prometheus:
         enabled: true
 
+# ====================== OPENAPI ======================
+springdoc:
+  paths-to-match: /api/v1/**
+
 # ====================== LOGGING ======================
 logging:
   level:
