@@ -21,7 +21,8 @@ buildNumber.properties
 *.iws
 *.iml
 *.ipr
-out/
+# Root IntelliJ output only. A bare "out/" also ignores source packages named out.
+/out/
 
 ### Logs ###
 *.log
